@@ -13,7 +13,8 @@ const CSV_URLS = [
   'https://www.war.gov/UFO/uap-csv.csv',
 ];
 
-const USER_AGENT = 'uap-viewer/1.0 (+https://github.com/seren00/ufo)';
+const USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+const GEOCODER_UA = 'uap-viewer/1.0 (+https://github.com/seren00/ufo)';
 
 const MANUAL_LOCATIONS = {
   'western united states':       [40.0, -113.0],
@@ -56,20 +57,32 @@ const SKIP_LOCATIONS = new Set([
 ]);
 
 async function fetchCSV() {
+  const errors = [];
   for (const url of CSV_URLS) {
     try {
-      const resp = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
-      if (!resp.ok) continue;
+      const resp = await fetch(url, {
+        headers: {
+          'User-Agent': USER_AGENT,
+          'Accept': 'text/csv,text/plain,*/*',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      if (!resp.ok) {
+        errors.push(`${url} -> HTTP ${resp.status}`);
+        continue;
+      }
       const text = await resp.text();
       if (text.length > 500) {
         console.log(`[refresh] Fetched CSV from ${url} (${text.length} bytes)`);
         return text;
       }
+      errors.push(`${url} -> body ${text.length} bytes`);
     } catch (e) {
+      errors.push(`${url} -> ${e.message}`);
       console.warn(`[refresh] Fetch failed for ${url}: ${e.message}`);
     }
   }
-  throw new Error('All CSV URLs failed or returned bodies under 500 bytes');
+  throw new Error('All CSV URLs failed: ' + errors.join('; '));
 }
 
 function parseCSV(text) {
@@ -195,7 +208,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function geocodePhoton(query) {
   const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`;
-  const resp = await fetch(url, { headers: { 'User-Agent': USER_AGENT, 'Accept': 'application/json' } });
+  const resp = await fetch(url, { headers: { 'User-Agent': GEOCODER_UA, 'Accept': 'application/json' } });
   if (!resp.ok) throw new Error(`photon http ${resp.status}`);
   const data = await resp.json();
   const f = data.features && data.features[0];
@@ -207,7 +220,7 @@ async function geocodePhoton(query) {
 
 async function geocodeNominatim(query) {
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
-  const resp = await fetch(url, { headers: { 'User-Agent': USER_AGENT, 'Accept': 'application/json' } });
+  const resp = await fetch(url, { headers: { 'User-Agent': GEOCODER_UA, 'Accept': 'application/json' } });
   if (!resp.ok) throw new Error(`nominatim http ${resp.status}`);
   const data = await resp.json();
   if (!Array.isArray(data) || !data.length) return null;

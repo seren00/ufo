@@ -15,17 +15,27 @@ const app = express();
 app.use(express.static(PUBLIC_DIR));
 
 let refreshing = false;
+let lastError = null;
+let lastErrorAt = null;
+let lastSuccessAt = null;
+
 async function safeRefresh() {
   if (refreshing) {
     console.log('[server] Refresh already in progress; skipping');
-    return null;
+    return { skipped: true };
   }
   refreshing = true;
   try {
-    return await refresh();
+    const result = await refresh();
+    lastError = null;
+    lastErrorAt = null;
+    lastSuccessAt = new Date().toISOString();
+    return result;
   } catch (e) {
     console.error('[server] Refresh failed:', e);
-    return null;
+    lastError = e.message || String(e);
+    lastErrorAt = new Date().toISOString();
+    return { error: lastError };
   } finally {
     refreshing = false;
   }
@@ -36,23 +46,32 @@ app.get('/api/data.json', async (req, res) => {
     const text = await fs.readFile(CACHE_PATH, 'utf-8');
     res.type('application/json').send(text);
   } catch {
-    res.status(503).json({ error: 'cache not ready', refreshing });
+    res.status(503).json({
+      error: 'cache not ready',
+      refreshing,
+      last_error: lastError,
+      last_error_at: lastErrorAt,
+      hint: refreshing
+        ? 'refresh in progress, try again in a few minutes'
+        : (lastError ? 'last refresh failed; POST /api/refresh to retry' : 'no refresh has run yet'),
+    });
   }
 });
 
 app.get('/api/status', async (req, res) => {
+  let cache = null;
   try {
-    const text = await fs.readFile(CACHE_PATH, 'utf-8');
-    const data = JSON.parse(text);
-    res.json({
-      generated_at: data.generated_at,
-      record_count: data.record_count,
-      placed_count: data.placed_count,
-      refreshing,
-    });
-  } catch {
-    res.status(503).json({ error: 'cache not ready', refreshing });
-  }
+    cache = JSON.parse(await fs.readFile(CACHE_PATH, 'utf-8'));
+  } catch {}
+  res.json({
+    generated_at: cache?.generated_at || null,
+    record_count: cache?.record_count || 0,
+    placed_count: cache?.placed_count || 0,
+    refreshing,
+    last_error: lastError,
+    last_error_at: lastErrorAt,
+    last_success_at: lastSuccessAt,
+  });
 });
 
 app.post('/api/refresh', async (req, res) => {
@@ -60,8 +79,8 @@ app.post('/api/refresh', async (req, res) => {
     return res.status(429).json({ error: 'refresh already in progress' });
   }
   const result = await safeRefresh();
-  if (!result) {
-    return res.status(500).json({ error: 'refresh failed' });
+  if (result?.error) {
+    return res.status(500).json({ error: result.error });
   }
   res.json(result);
 });
