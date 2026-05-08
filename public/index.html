@@ -160,6 +160,29 @@ h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
   header, .controls, .grid { padding-left: 16px; padding-right: 16px; }
   .controls input[type=search] { min-width: 0; flex: 1; }
 }
+
+.ufo-sprite {
+  position: fixed; top: 0; left: 0;
+  font-size: 32px; line-height: 1;
+  pointer-events: none; z-index: 1500;
+  filter: drop-shadow(0 0 10px rgba(78,161,255,0.7));
+  will-change: transform, opacity;
+  user-select: none;
+}
+.ufo-toggle {
+  position: fixed; bottom: 16px; left: 16px;
+  background: var(--panel); border: 1px solid var(--border);
+  color: var(--muted); padding: 6px 12px; border-radius: 20px;
+  font-size: 12px; cursor: pointer; z-index: 1600;
+  font-family: inherit; transition: color 0.15s, border-color 0.15s;
+}
+.ufo-toggle:hover { color: var(--text); border-color: var(--accent); }
+.ufo-beam {
+  position: fixed; top: 0; left: 0; width: 18px; height: 60px;
+  background: radial-gradient(ellipse at top, rgba(120,255,200,0.6) 0%, rgba(120,255,200,0) 70%);
+  pointer-events: none; z-index: 1499;
+  transform-origin: top center;
+}
 </style>
 </head>
 <body>
@@ -546,6 +569,106 @@ function truncate(s, n) {
   if (s.length <= n) return s;
   return s.slice(0, n).trim() + '…';
 }
+
+// ─── 🛸 UFO invasion mode ──────────────────────────────────────────
+let UFO_ENABLED = (() => {
+  try { return localStorage.getItem('ufo_disabled') !== '1'; } catch { return true; }
+})();
+const UFO_SPRITES = ['🛸', '🛸', '🛸', '👽', '🛸', '👾'];
+
+function pickSprite() {
+  return UFO_SPRITES[Math.floor(Math.random() * UFO_SPRITES.length)];
+}
+
+function flyAcrossScreen() {
+  const el = document.createElement('div');
+  el.className = 'ufo-sprite';
+  el.textContent = pickSprite();
+  document.body.appendChild(el);
+
+  const W = window.innerWidth, H = window.innerHeight;
+  const fromLeft = Math.random() < 0.5;
+  const startX = fromLeft ? -60 : W + 60;
+  const endX = fromLeft ? W + 60 : -60;
+  const baseY = 80 + Math.random() * Math.max(100, H - 200);
+  const dur = 7000 + Math.random() * 5000;
+
+  const N = 30, keyframes = [];
+  const phase = Math.random() * Math.PI * 2;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const x = startX + (endX - startX) * t;
+    const y = baseY + Math.sin(t * Math.PI * 3 + phase) * 50;
+    const rot = Math.sin(t * Math.PI * 4) * 12 * (fromLeft ? 1 : -1);
+    keyframes.push({ transform: `translate(${x}px, ${y}px) rotate(${rot}deg)` });
+  }
+  el.animate(keyframes, { duration: dur, easing: 'linear' }).onfinish = () => el.remove();
+}
+
+function abductionFromMarker() {
+  const markerEls = document.querySelectorAll('.agency-marker');
+  if (!markerEls.length) { flyAcrossScreen(); return; }
+  const mEl = markerEls[Math.floor(Math.random() * markerEls.length)];
+  const rect = mEl.getBoundingClientRect();
+  if (rect.width === 0) { flyAcrossScreen(); return; }
+  const sx = rect.left + rect.width / 2 - 16;
+  const sy = rect.top + rect.height / 2 - 16;
+
+  const ufo = document.createElement('div');
+  ufo.className = 'ufo-sprite';
+  ufo.textContent = '🛸';
+  ufo.style.transform = `translate(${sx}px, ${sy}px) scale(0)`;
+  document.body.appendChild(ufo);
+
+  const beam = document.createElement('div');
+  beam.className = 'ufo-beam';
+  beam.style.transform = `translate(${sx + 7}px, ${sy + 28}px) scaleY(0)`;
+  document.body.appendChild(beam);
+
+  const angle = (Math.random() * 1.6 - 0.8) + (Math.random() < 0.5 ? Math.PI : 0);
+  const dist = 250 + Math.random() * 350;
+  const ex = Math.max(-60, Math.min(window.innerWidth + 60, sx + Math.cos(angle) * dist));
+  const ey = Math.max(60, Math.min(window.innerHeight - 60, sy + Math.sin(angle) * dist - 80));
+
+  ufo.animate([
+    { transform: `translate(${sx}px, ${sy}px) scale(0) rotate(0deg)`, opacity: 0 },
+    { transform: `translate(${sx}px, ${sy - 40}px) scale(1) rotate(0deg)`, opacity: 1, offset: 0.18 },
+    { transform: `translate(${sx + (ex-sx)*0.3}px, ${sy - 70}px) scale(1.1) rotate(15deg)`, opacity: 1, offset: 0.55 },
+    { transform: `translate(${ex}px, ${ey}px) scale(0.7) rotate(-10deg)`, opacity: 0 },
+  ], { duration: 5500, easing: 'ease-out' }).onfinish = () => ufo.remove();
+
+  beam.animate([
+    { transform: `translate(${sx + 7}px, ${sy + 28}px) scaleY(0)`, opacity: 0 },
+    { transform: `translate(${sx + 7}px, ${sy + 28}px) scaleY(1)`, opacity: 1, offset: 0.2 },
+    { transform: `translate(${sx + 7}px, ${sy + 28}px) scaleY(1)`, opacity: 0.8, offset: 0.5 },
+    { transform: `translate(${sx + 7}px, ${sy + 28}px) scaleY(0)`, opacity: 0 },
+  ], { duration: 1500, easing: 'ease-out' }).onfinish = () => beam.remove();
+}
+
+function ufoLoop() {
+  const next = 18000 + Math.random() * 25000;
+  setTimeout(() => {
+    if (UFO_ENABLED) {
+      if (CURRENT_VIEW === 'map' && Math.random() < 0.55) abductionFromMarker();
+      else flyAcrossScreen();
+    }
+    ufoLoop();
+  }, next);
+}
+ufoLoop();
+setTimeout(() => { if (UFO_ENABLED) flyAcrossScreen(); }, 4000);
+
+const ufoBtn = document.createElement('button');
+ufoBtn.className = 'ufo-toggle';
+ufoBtn.textContent = UFO_ENABLED ? '🛸 UFOs: ON' : '🛸 UFOs: OFF';
+ufoBtn.title = 'Toggle UFO sightings on this page';
+ufoBtn.onclick = () => {
+  UFO_ENABLED = !UFO_ENABLED;
+  ufoBtn.textContent = UFO_ENABLED ? '🛸 UFOs: ON' : '🛸 UFOs: OFF';
+  try { localStorage.setItem('ufo_disabled', UFO_ENABLED ? '0' : '1'); } catch {}
+  if (UFO_ENABLED) flyAcrossScreen();
+};
+document.body.appendChild(ufoBtn);
 
 bootstrap();
 </script>
