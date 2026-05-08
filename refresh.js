@@ -58,15 +58,24 @@ const SKIP_LOCATIONS = new Set([
 
 async function fetchCSV() {
   const errors = [];
+  const headers = {
+    'User-Agent': USER_AGENT,
+    'Accept': 'text/csv,application/vnd.ms-excel,text/plain,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Referer': 'https://www.war.gov/UFO/',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Ch-Ua': '"Chromium";v="120", "Not.A/Brand";v="24", "Google Chrome";v="120"',
+    'Sec-Ch-Ua-Mobile': '?0',
+    'Sec-Ch-Ua-Platform': '"Linux"',
+  };
   for (const url of CSV_URLS) {
     try {
-      const resp = await fetch(url, {
-        headers: {
-          'User-Agent': USER_AGENT,
-          'Accept': 'text/csv,text/plain,*/*',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-      });
+      const resp = await fetch(url, { headers, redirect: 'follow' });
       if (!resp.ok) {
         errors.push(`${url} -> HTTP ${resp.status}`);
         continue;
