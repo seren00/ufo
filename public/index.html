@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>UFO Files Viewer — war.gov UAP Release 1</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UAP Viewer — war.gov UFO Release</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css" />
@@ -20,6 +21,8 @@ header { padding: 24px 32px 16px; border-bottom: 1px solid var(--border);
   background: linear-gradient(180deg, #0d1424 0%, var(--bg) 100%); }
 h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
 .sub { color: var(--muted); font-size: 13px; }
+.sub a { color: var(--accent); text-decoration: none; }
+.sub a:hover { text-decoration: underline; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   padding: 16px 32px; border-bottom: 1px solid var(--border);
   background: var(--panel); position: sticky; top: 0; z-index: 500; }
@@ -36,12 +39,17 @@ h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
 .view-toggle button.active { background: var(--accent-dim); color: white; }
 .view-toggle button:hover:not(.active) { color: var(--text); }
 .stats { color: var(--muted); font-size: 12px; margin-left: auto; }
-#load-area { padding: 40px 32px; text-align: center; color: var(--muted); }
-#load-area input[type=file] { margin: 16px 0; padding: 8px; color: var(--text); }
-#diag { text-align: left; max-width: 780px; margin: 16px auto 0;
-  padding: 14px 16px; background: #0a0a0a; border: 1px solid var(--border);
-  border-radius: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 11px;
-  color: var(--muted); white-space: pre-wrap; word-break: break-all; display: none; }
+
+#loading, #error-state {
+  padding: 80px 32px; text-align: center; color: var(--muted);
+}
+#error-state { display: none; color: var(--warn); }
+.spinner { display: inline-block; width: 16px; height: 16px;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+  vertical-align: middle; margin-right: 10px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 14px; padding: 20px 32px; }
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
@@ -73,15 +81,6 @@ h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
 
 #map-wrap { display: none; position: relative; height: calc(100vh - 130px); }
 #map { width: 100%; height: 100%; background: #0a0a0a; }
-#map-status { position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-  background: rgba(19, 26, 42, 0.95); border: 1px solid var(--border);
-  padding: 8px 14px; border-radius: 6px; font-size: 12px; color: var(--text);
-  z-index: 1000; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-.spinner { display: inline-block; width: 12px; height: 12px;
-  border: 2px solid var(--border); border-top-color: var(--accent);
-  border-radius: 50%; animation: spin 0.8s linear infinite;
-  vertical-align: middle; margin-right: 8px; }
-@keyframes spin { to { transform: rotate(360deg); } }
 .leaflet-popup-content-wrapper, .leaflet-popup-tip {
   background: var(--panel); color: var(--text); border: 1px solid var(--border); }
 .leaflet-popup-content { margin: 12px 14px; font-size: 12px; }
@@ -94,6 +93,7 @@ h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
 .leaflet-container a.leaflet-popup-close-button { color: var(--muted); }
 .agency-marker { border: 2px solid white; border-radius: 50%;
   box-shadow: 0 1px 4px rgba(0,0,0,0.6); }
+
 #unmapped { background: var(--panel); border-top: 1px solid var(--border);
   padding: 12px 32px; display: none; font-size: 12px; color: var(--muted);
   max-height: 180px; overflow-y: auto; }
@@ -103,6 +103,7 @@ h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
   padding: 2px 8px; background: var(--bg); border: 1px solid var(--border);
   border-radius: 4px; font-size: 11px; cursor: pointer; }
 #unmapped-list .um-item:hover { border-color: var(--accent); color: var(--accent); }
+
 .legend { position: absolute; bottom: 16px; right: 16px;
   background: rgba(19, 26, 42, 0.95); border: 1px solid var(--border);
   padding: 10px 12px; border-radius: 6px; font-size: 11px;
@@ -136,6 +137,10 @@ h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
   padding: 9px 16px; border-radius: 6px; font-family: inherit; font-size: 13px;
   cursor: pointer; text-decoration: none; display: inline-block; }
 .btn:hover { background: var(--accent); }
+.no-links {
+  margin-top: 14px; padding: 10px 12px; background: #2a1a1a;
+  border: 1px solid #4a2a2a; border-radius: 6px; color: var(--warn); font-size: 12px;
+}
 @media (max-width: 600px) {
   header, .controls, .grid { padding-left: 16px; padding-right: 16px; }
   .controls input[type=search] { min-width: 0; flex: 1; }
@@ -145,23 +150,13 @@ h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
 <body>
 
 <header>
-  <h1>UFO Files Viewer</h1>
-  <div class="sub">Department of War — Release 01 — May 8, 2026 — <a href="https://www.war.gov/UFO/" target="_blank" style="color: var(--accent);">PURSUE Archive</a></div>
+  <h1>UAP Viewer</h1>
+  <div class="sub">
+    Department of War — UFO/PURSUE archive —
+    <a href="https://www.war.gov/UFO/" target="_blank" rel="noopener">war.gov/UFO</a>
+    <span id="last-updated"></span>
+  </div>
 </header>
-
-<div id="load-area">
-  <p>Drop your <code>uap-csv.csv</code> file here, or pick it manually:</p>
-  <input type="file" id="file-input" accept=".csv,.tsv,text/*">
-  <p style="font-size:12px; margin-top: 16px;">
-    Get the CSV by opening <a href="https://www.war.gov/UFO/" target="_blank" style="color: var(--accent);">war.gov/UFO</a>,
-    F12 → Console, paste this and hit Enter:
-  </p>
-  <pre style="text-align:left; max-width:640px; margin:12px auto; padding:14px; background:#0a0a0a; border-radius:6px; font-size:11px; overflow:auto; color: var(--muted);">fetch('https://www.war.gov/Portals/1/Interactive/2026/UFO/uap-csv.csv')
-  .then(r =&gt; r.text())
-  .then(t =&gt; { const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([t]));
-    a.download='uap-csv.csv'; a.click(); });</pre>
-  <div id="diag"></div>
-</div>
 
 <div class="controls" id="controls" style="display:none">
   <div class="view-toggle">
@@ -182,15 +177,16 @@ h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
     <option value="incident_date">Sort: Incident date</option>
     <option value="incident_location">Sort: Location</option>
   </select>
-  <button id="retry-geocode" title="Clear geocode cache and try locating unmapped records again" style="background:var(--bg);color:var(--muted);border:1px solid var(--border);padding:7px 11px;border-radius:6px;font-size:13px;font-family:inherit;cursor:pointer;display:none;">↻ Retry locations</button>
   <span class="stats" id="stats"></span>
 </div>
+
+<div id="loading"><span class="spinner"></span>Loading records...</div>
+<div id="error-state"></div>
 
 <div class="grid" id="grid"></div>
 
 <div id="map-wrap">
   <div id="map"></div>
-  <div id="map-status"></div>
   <div class="legend" id="legend"></div>
 </div>
 
@@ -207,11 +203,9 @@ h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
 <script>
 let RECORDS = [];
-let HEADERS_DETECTED = [];
 let MAP = null;
 let MARKER_LAYER = null;
 let CURRENT_VIEW = 'grid';
-let GEOCODE_CACHE = {};
 let UNMAPPED = [];
 let AGENCY_COLORS = {};
 
@@ -221,182 +215,32 @@ const PALETTE = [
   '#22c55e', '#e879f9', '#64748b'
 ];
 
-const MANUAL_LOCATIONS = {
-  'western united states':       [40.0, -113.0],
-  'eastern united states':       [38.0, -78.0],
-  'southern united states':      [32.0, -90.0],
-  'northern united states':      [46.0, -95.0],
-  'midwestern united states':    [41.5, -93.0],
-  'continental united states':   [39.5, -98.5],
-  'united states':               [39.5, -98.5],
-  'usa':                         [39.5, -98.5],
-  'u.s.':                        [39.5, -98.5],
-  'atlantic ocean':              [25.0, -45.0],
-  'pacific ocean':               [10.0, -150.0],
-  'indian ocean':                [-15.0, 75.0],
-  'mediterranean sea':           [35.5, 18.0],
-  'caribbean sea':               [15.0, -75.0],
-  'gulf of mexico':              [25.0, -90.0],
-  'north atlantic':              [45.0, -35.0],
-  'south atlantic':              [-25.0, -15.0],
-  'north pacific':               [35.0, -160.0],
-  'south pacific':               [-25.0, -140.0],
-  'south china sea':             [15.0, 115.0],
-  'persian gulf':                [27.0, 51.0],
-  'bering sea':                  [58.0, -178.0],
-  'arctic ocean':                [85.0, 0.0],
-  'middle east':                 [29.0, 42.0],
-  'europe':                      [50.0, 10.0],
-  'asia':                        [35.0, 100.0],
-  'africa':                      [0.0, 20.0],
-  'south america':               [-15.0, -60.0],
-  'central america':             [13.0, -85.0],
-  'low earth orbit':             [0, 0],
-  'orbit':                       [0, 0],
-  'space':                       [0, 0],
-  'outer space':                 [0, 0],
-  'classified':                  null,
-  'redacted':                    null,
-  'unknown':                     null,
-  'n/a':                         null,
-  '':                            null,
-};
-
-const loadArea = document.getElementById('load-area');
-const fileInput = document.getElementById('file-input');
-const diag = document.getElementById('diag');
-
-fileInput.addEventListener('change', e => {
-  const f = e.target.files[0];
-  if (f) loadFile(f);
-});
-['dragover', 'drop'].forEach(ev => {
-  document.body.addEventListener(ev, e => { e.preventDefault(); });
-});
-document.body.addEventListener('drop', e => {
-  e.preventDefault();
-  const f = e.dataTransfer.files[0];
-  if (f) loadFile(f);
-});
-
-function loadFile(file) {
-  const reader = new FileReader();
-  reader.onload = () => {
-    let text = reader.result;
-    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-    const firstLine = text.split('\n', 1)[0];
-    const tabCount = (firstLine.match(/\t/g) || []).length;
-    const commaCount = (firstLine.match(/,/g) || []).length;
-    const delim = tabCount >= commaCount && tabCount > 2 ? '\t' : ',';
-    const rows = parseCSV(text, delim);
-    if (rows.length < 2) {
-      showDiag(`Couldn't parse file. Delim: ${delim === '\t' ? 'TAB' : 'COMMA'}, rows: ${rows.length}`);
-      return;
+async function bootstrap() {
+  try {
+    const resp = await fetch('/api/data.json');
+    if (!resp.ok) {
+      throw new Error(resp.status === 503
+        ? 'Server is still building the cache — try again in a moment.'
+        : `Server returned ${resp.status}`);
     }
-    HEADERS_DETECTED = rows[0].map(h => h.trim());
-    RECORDS = rowsToRecords(rows);
-    if (RECORDS.length === 0) {
-      showDiag(`0 records.\nHeaders:\n${HEADERS_DETECTED.map((h,i)=>`  [${i}] "${h}"`).join('\n')}`);
-      return;
-    }
+    const data = await resp.json();
+    RECORDS = data.records || [];
+    document.getElementById('last-updated').textContent =
+      data.generated_at ? ' — last updated ' + new Date(data.generated_at).toLocaleString() : '';
+    if (!RECORDS.length) throw new Error('No records in cache');
     init();
-  };
-  reader.readAsText(file, 'utf-8');
-}
-
-function showDiag(msg) { diag.style.display = 'block'; diag.textContent = msg; }
-
-function parseCSV(text, delim) {
-  const rows = [];
-  let row = [], cell = '', inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inQuotes) {
-      if (c === '"' && text[i+1] === '"') { cell += '"'; i++; }
-      else if (c === '"') { inQuotes = false; }
-      else { cell += c; }
-    } else {
-      if (c === '"') inQuotes = true;
-      else if (c === delim) { row.push(cell); cell = ''; }
-      else if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
-      else if (c === '\r') {}
-      else cell += c;
-    }
+  } catch (e) {
+    document.getElementById('loading').style.display = 'none';
+    const err = document.getElementById('error-state');
+    err.style.display = 'block';
+    err.textContent = '⚠ ' + e.message;
   }
-  if (cell || row.length) { row.push(cell); rows.push(row); }
-  return rows;
 }
-
-function rowsToRecords(rows) {
-  const header = rows[0].map(h => h.trim());
-  const findCol = (...candidates) => {
-    for (const cand of candidates) {
-      const wanted = cand.toLowerCase().replace(/\s+/g, ' ').trim();
-      let i = header.findIndex(h => h.toLowerCase().replace(/\s+/g, ' ').trim() === wanted);
-      if (i !== -1) return i;
-      i = header.findIndex(h => h.toLowerCase().replace(/\s+/g, ' ').trim().startsWith(wanted));
-      if (i !== -1) return i;
-      i = header.findIndex(h => h.toLowerCase().replace(/\s+/g, ' ').trim().includes(wanted));
-      if (i !== -1) return i;
-    }
-    return -1;
-  };
-  const cols = {
-    redaction: findCol('Redaction'),
-    title: findCol('Title'),
-    type: findCol('Type'),
-    agency: findCol('Agency'),
-    incident_date: findCol('Incident Date'),
-    incident_location: findCol('Incident Location'),
-    description: findCol('Description Blurb', 'Description'),
-    pdf_url: findCol('PDF | Image Link', 'PDF Image Link', 'PDF | Image', 'PDF Link', 'Image Link', 'PDF'),
-    thumb: findCol('Modal Image', 'Thumbnail'),
-    dvids: findCol('DVIDS Video ID', 'DVIDS Video', 'DVIDS ID', 'DVIDS'),
-    video_title: findCol('Video Title'),
-    video_pairing: findCol('Video Pairing'),
-    pdf_pairing: findCol('PDF Pairing'),
-  };
-  const recs = [];
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
-    if (!r[cols.title]) continue;
-    recs.push({
-      id: i,
-      title: clean(r[cols.title]),
-      type: clean(r[cols.type]),
-      agency: clean(r[cols.agency]),
-      incident_date: clean(r[cols.incident_date]),
-      incident_location: clean(r[cols.incident_location]),
-      description: clean(r[cols.description]),
-      redaction: (r[cols.redaction] || '').trim().toUpperCase() === 'TRUE',
-      pdf_url: cleanURL(r[cols.pdf_url]),
-      thumb: cleanURL(r[cols.thumb]),
-      dvids: cleanID(r[cols.dvids]),
-      video_title: clean(r[cols.video_title]),
-      video_pairing: clean(r[cols.video_pairing]),
-      pdf_pairing: clean(r[cols.pdf_pairing]),
-      lat: null, lng: null, geo_status: 'pending',
-    });
-  }
-  return recs;
-}
-
-function clean(s) {
-  if (!s) return '';
-  return s.replace(/^\s+|\s+$/g, '').replace(/^"|"$/g, '').trim();
-}
-function cleanURL(s) {
-  s = clean(s);
-  if (!s) return '';
-  if (/^https?:\/\//i.test(s)) return s;
-  if (s.startsWith('/')) return 'https://www.war.gov' + s;
-  return s;
-}
-function cleanID(s) { s = clean(s); return s.replace(/[^\d]/g, ''); }
 
 function init() {
-  loadArea.style.display = 'none';
+  document.getElementById('loading').style.display = 'none';
   document.getElementById('controls').style.display = 'flex';
+
   const agencies = [...new Set(RECORDS.map(r => r.agency).filter(Boolean))].sort();
   agencies.forEach((a, i) => { AGENCY_COLORS[a] = PALETTE[i % PALETTE.length]; });
 
@@ -411,40 +255,6 @@ function init() {
   });
   document.getElementById('view-grid').addEventListener('click', () => switchView('grid'));
   document.getElementById('view-map').addEventListener('click', () => switchView('map'));
-  document.getElementById('retry-geocode').addEventListener('click', () => {
-    if (!confirm('Clear cached locations and re-geocode all unmapped records?')) return;
-    GEOCODE_CACHE = {};
-    try { localStorage.removeItem('ufo_geocache'); } catch {}
-    for (const r of RECORDS) {
-      if (r.geo_status === 'fail' || (r.lat == null && r.incident_location)) {
-        const key = r.incident_location.toLowerCase().trim();
-        if (!(key in MANUAL_LOCATIONS)) {
-          r.geo_status = 'pending';
-          r.lat = null; r.lng = null;
-        }
-      }
-    }
-    geocodeAll().then(() => render());
-  });
-
-  try {
-    GEOCODE_CACHE = JSON.parse(localStorage.getItem('ufo_geocache') || '{}');
-  } catch { GEOCODE_CACHE = {}; }
-
-  // Apply cached geocodes to records up front so map view loads instantly on revisit
-  for (const r of RECORDS) {
-    if (!r.incident_location) { r.geo_status = 'fail'; continue; }
-    const key = r.incident_location.toLowerCase().trim();
-    if (key in MANUAL_LOCATIONS) {
-      const v = MANUAL_LOCATIONS[key];
-      if (v) { r.lat = v[0]; r.lng = v[1]; r.geo_status = 'ok'; }
-      else r.geo_status = 'fail';
-    } else if (key in GEOCODE_CACHE) {
-      const v = GEOCODE_CACHE[key];
-      if (v) { r.lat = v[0]; r.lng = v[1]; r.geo_status = 'ok'; }
-      else r.geo_status = 'fail';
-    }
-  }
 
   render();
 }
@@ -456,22 +266,16 @@ function switchView(view) {
   document.getElementById('grid').style.display = view === 'grid' ? 'grid' : 'none';
   document.getElementById('map-wrap').style.display = view === 'map' ? 'block' : 'none';
   document.getElementById('unmapped').style.display = view === 'map' && UNMAPPED.length ? 'block' : 'none';
-  document.getElementById('retry-geocode').style.display = view === 'map' ? 'inline-block' : 'none';
-
   if (view === 'map') {
     if (!MAP) initMap();
     setTimeout(() => MAP.invalidateSize(), 50);
-    geocodeAll().then(() => render());
-  } else {
-    render();
   }
+  render();
 }
 
 function initMap() {
   MAP = L.map('map', { worldCopyJump: true }).setView([30, 0], 2);
 
-  // Try multiple tile providers — if one is blocked, the next is tried.
-  // Order: CARTO dark (best looking) → Esri satellite (different infra) → OSM standard
   const tileProviders = [
     {
       url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
@@ -491,15 +295,13 @@ function initMap() {
   ];
 
   let tileLayer = null;
-  let providerIdx = 0;
   function tryProvider(i) {
     if (i >= tileProviders.length) {
-      // All failed — show a notice
-      const notice = L.control({position: 'topright'});
+      const notice = L.control({ position: 'topright' });
       notice.onAdd = () => {
         const d = L.DomUtil.create('div');
         d.style.cssText = 'background:#2a1a1a;border:1px solid #4a2a2a;color:#ff9d4a;padding:8px 12px;border-radius:6px;font-size:11px;max-width:240px;';
-        d.innerHTML = '⚠ All map tile servers blocked. Pins will still show on a blank background. Likely your ISP or firewall is blocking these domains.';
+        d.innerHTML = '⚠ All map tile servers blocked. Pins still show.';
         return d;
       };
       notice.addTo(MAP);
@@ -516,14 +318,15 @@ function initMap() {
     tileLayer.on('tileerror', () => {
       if (errored) return;
       errored = true;
-      console.warn(`Tile provider ${i} (${p.url}) failed, trying next...`);
       tryProvider(i + 1);
     });
     tileLayer.addTo(MAP);
   }
   tryProvider(0);
+
   MARKER_LAYER = L.markerClusterGroup({
-    showCoverageOnHover: false, maxClusterRadius: 50,
+    showCoverageOnHover: false,
+    maxClusterRadius: 50,
   });
   MAP.addLayer(MARKER_LAYER);
   buildLegend();
@@ -537,87 +340,6 @@ function buildLegend() {
   });
   html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--muted)">Red border = redacted</div>';
   legend.innerHTML = html;
-}
-
-async function geocodeAll() {
-  const status = document.getElementById('map-status');
-  const todo = RECORDS.filter(r => r.geo_status === 'pending' && r.incident_location);
-  if (!todo.length) { status.style.display = 'none'; return; }
-
-  let done = 0;
-  status.style.display = 'block';
-  status.innerHTML = `<span class="spinner"></span>Locating ${todo.length} incidents...`;
-
-  for (const rec of todo) {
-    const result = await geocodeOne(rec.incident_location);
-    if (result) {
-      rec.lat = result[0]; rec.lng = result[1]; rec.geo_status = 'ok';
-    } else {
-      rec.geo_status = 'fail';
-    }
-    done++;
-    if (done % 3 === 0 || done === todo.length) {
-      status.innerHTML = `<span class="spinner"></span>Locating ${done}/${todo.length} incidents...`;
-      // Update map progressively so user sees pins appearing
-      render();
-    }
-  }
-  try { localStorage.setItem('ufo_geocache', JSON.stringify(GEOCODE_CACHE)); } catch {}
-  setTimeout(() => { status.style.display = 'none'; }, 800);
-}
-
-async function geocodeOne(location) {
-  const key = location.toLowerCase().trim();
-  if (key in MANUAL_LOCATIONS) return MANUAL_LOCATIONS[key];
-  if (key in GEOCODE_CACHE) return GEOCODE_CACHE[key];
-  for (const [pattern, coords] of Object.entries(MANUAL_LOCATIONS)) {
-    if (pattern && key.includes(pattern)) return coords;
-  }
-
-  // Try multiple geocoders. If first one is blocked/rate-limited, try the next.
-  const geocoders = [
-    {
-      name: 'photon',
-      url: `https://photon.komoot.io/api/?q=${encodeURIComponent(location)}&limit=1`,
-      parse: (data) => {
-        const f = data.features && data.features[0];
-        if (!f || !f.geometry) return null;
-        // Photon returns [lng, lat]
-        return [f.geometry.coordinates[1], f.geometry.coordinates[0]];
-      },
-      delay: 200, // Photon is generous; don't need 1s
-    },
-    {
-      name: 'nominatim',
-      url: `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(location)}`,
-      parse: (data) => {
-        if (!data || !data.length) return null;
-        return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-      },
-      delay: 1100, // Nominatim asks for max 1 req/sec
-    },
-  ];
-
-  for (const g of geocoders) {
-    try {
-      await new Promise(r => setTimeout(r, g.delay));
-      const resp = await fetch(g.url, { headers: { 'Accept': 'application/json' }});
-      if (!resp.ok) throw new Error('http ' + resp.status);
-      const data = await resp.json();
-      const result = g.parse(data);
-      if (result) {
-        GEOCODE_CACHE[key] = result;
-        return result;
-      }
-      // Service responded but found nothing — try next provider
-    } catch (e) {
-      console.warn(`Geocoder ${g.name} failed for "${location}":`, e.message);
-      // Try next provider
-    }
-  }
-  // Both failed
-  GEOCODE_CACHE[key] = null;
-  return null;
 }
 
 function getFiltered() {
@@ -664,7 +386,7 @@ function renderMap(records) {
 
   for (const r of records) {
     if (r.lat == null || r.lng == null) {
-      if (r.geo_status !== 'pending') UNMAPPED.push(r);
+      if (r.incident_location) UNMAPPED.push(r);
       continue;
     }
     const color = AGENCY_COLORS[r.agency] || '#888';
@@ -691,7 +413,7 @@ function renderMap(records) {
     ).join('');
     umList.querySelectorAll('.um-item').forEach(el => {
       el.addEventListener('click', () => {
-        const rec = RECORDS.find(x => x.id == el.dataset.id);
+        const rec = RECORDS.find(x => String(x.id) === el.dataset.id);
         if (rec) showModal(rec);
       });
     });
@@ -707,7 +429,7 @@ function makePopupHTML(r) {
       ${escapeHTML(r.agency || '?')} · ${escapeHTML(r.incident_date || '—')}<br>
       ${escapeHTML(r.incident_location || '')}
     </div>
-    ${r.thumb ? `<img src="${escapeAttr(r.thumb)}" alt="">` : ''}
+    ${r.thumb ? `<img src="${escapeAttr(r.thumb)}" alt="" loading="lazy">` : ''}
     <div style="font-size:11px;margin-top:6px">${escapeHTML(truncate(r.description, 140))}</div>
     <a class="pop-link" href="#" onclick="event.preventDefault();showModalById(${r.id})">View details →</a>
   `;
@@ -734,7 +456,7 @@ function makeCard(r) {
         ${r.type ? `<span class="tag ${typeClass}">${escapeHTML(r.type)}</span>` : ''}
         ${r.redaction ? `<span class="tag redact">REDACTED</span>` : ''}
       </div>
-      <div class="card-loc">${escapeHTML(r.incident_location || 'N/A')} ${r.incident_date ? '· ' + escapeHTML(r.incident_date) : ''}</div>
+      <div class="card-loc">${escapeHTML(r.incident_location || 'N/A')}${r.incident_date ? ' · ' + escapeHTML(r.incident_date) : ''}</div>
       <div class="card-desc">${escapeHTML(truncate(r.description, 220))}</div>
     </div>`;
   return div;
@@ -750,10 +472,10 @@ function showModal(r) {
     ? `<a class="btn" href="${escapeAttr(r.pdf_url)}" target="_blank" rel="noopener">Open file →</a>`
     : '';
   const noLinks = !dvidsURL && !r.pdf_url
-    ? `<div style="margin-top:14px;padding:10px 12px;background:#2a1a1a;border:1px solid #4a2a2a;border-radius:6px;color:#ff9d4a;font-size:12px;">⚠ No file or video link in CSV for this record.</div>`
+    ? `<div class="no-links">⚠ No file or video link in CSV for this record.</div>`
     : '';
   const thumbBig = r.thumb
-    ? `<img src="${escapeAttr(r.thumb)}" style="max-width:100%;border-radius:6px;margin-top:10px;border:1px solid var(--border)">`
+    ? `<img src="${escapeAttr(r.thumb)}" loading="lazy" style="max-width:100%;border-radius:6px;margin-top:10px;border:1px solid var(--border)" onerror="this.style.display='none'">`
     : '';
   m.innerHTML = `
     <button class="modal-close" onclick="closeModal()">×</button>
@@ -786,16 +508,18 @@ function closeModal() { document.getElementById('modal-bg').classList.remove('sh
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
 function escapeHTML(s) {
-  return String(s || '').replace(/[&<>"']/g, c => ({
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
 }
 function escapeAttr(s) { return escapeHTML(s); }
 function truncate(s, n) {
-  s = String(s || '');
+  s = String(s == null ? '' : s);
   if (s.length <= n) return s;
   return s.slice(0, n).trim() + '…';
 }
+
+bootstrap();
 </script>
 </body>
 </html>
