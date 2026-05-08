@@ -41,6 +41,11 @@ h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
 .view-toggle button svg { width: 16px; height: 16px; flex-shrink: 0; }
 .view-toggle button.active { background: var(--accent); color: white;
   box-shadow: inset 0 0 12px rgba(0,0,0,0.25); }
+.map-alien { font-size: 16px; line-height: 1; animation: alienBob 2.2s ease-in-out infinite; display: inline-block; }
+@keyframes alienBob {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50%      { transform: translateY(-3px) rotate(3deg); }
+}
 .view-toggle button:not(.active):hover { background: rgba(78,161,255,0.12);
   color: var(--accent); }
 .view-toggle button:not(.active) { position: relative; }
@@ -247,11 +252,12 @@ h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
 
 <div class="controls" id="controls" style="display:none">
   <div class="view-toggle" id="view-toggle">
-    <button id="view-grid" class="active" title="Gallery view">
+    <button id="view-grid" title="Gallery view">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       Gallery
     </button>
-    <button id="view-map" title="Map view — see incidents geographically">
+    <button id="view-map" class="active" title="Map view — see incidents geographically">
+      <span class="map-alien">👽</span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
       Map
     </button>
@@ -298,7 +304,7 @@ h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em
 let RECORDS = [];
 let MAP = null;
 let MARKER_LAYER = null;
-let CURRENT_VIEW = 'grid';
+let CURRENT_VIEW = 'map';
 let UNMAPPED = [];
 let AGENCY_COLORS = {};
 
@@ -351,19 +357,9 @@ function init() {
   document.getElementById('about-btn').addEventListener('click', () => {
     const p = document.getElementById('about-panel');
     p.hidden = !p.hidden;
-    try { localStorage.setItem('ufo_seen_about', '1'); } catch {}
   });
 
-  try {
-    if (localStorage.getItem('ufo_seen_about') !== '1') {
-      document.getElementById('about-panel').hidden = false;
-    }
-  } catch {}
-
-  const seenMap = (() => { try { return localStorage.getItem('ufo_seen_map') === '1'; } catch { return false; } })();
-  if (!seenMap) document.getElementById('view-toggle').classList.add('hint-map');
-
-  render();
+  switchView('map');
 }
 
 function switchView(view) {
